@@ -1,54 +1,64 @@
-import { useState } from 'react'
-import { useNavigate, Link, Navigate } from 'react-router-dom'
-import { Mail, Lock, AlertCircle, Loader2, Eye, EyeOff, ShieldCheck } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from "react";
+import { useNavigate, Link, Navigate } from "react-router-dom";
+import {
+  Mail,
+  Lock,
+  AlertCircle,
+  Loader2,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
-  const navigate = useNavigate()
-  const { signIn, user, loading: authLoading } = useAuth()
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const navigate = useNavigate();
+  const { signIn, user, loading: authLoading } = useAuth();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Jika sudah ada sesi aktif, langsung alihkan ke dashboard
   if (!authLoading && user) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setError("");
 
     if (!form.email || !form.password) {
-      setError('Email dan kata sandi wajib diisi.')
-      return
+      setError("Email dan kata sandi wajib diisi.");
+      return;
     }
 
-    setLoading(true)
+    setLoading(true);
     try {
       await signIn({
         email: form.email.trim(),
         password: form.password,
-      })
-      navigate('/dashboard', { replace: true })
+      });
+      navigate("/dashboard", { replace: true });
     } catch (err) {
-      console.error('Login error:', err)
-      const msg = err.message || ''
-      if (msg.includes('Invalid login credentials')) {
-        setError('Email atau kata sandi tidak valid. Silakan periksa kembali.')
-      } else if (msg.includes('Email not confirmed')) {
-        setError('Email belum dikonfirmasi. Silakan periksa kotak masuk email Anda.')
+      console.error("Login error:", err);
+      const msg = err.message || "";
+      if (msg.includes("Invalid login credentials")) {
+        setError("Email atau kata sandi tidak valid. Silakan periksa kembali.");
+      } else if (msg.includes("Email not confirmed")) {
+        setError(
+          "Email belum dikonfirmasi. Silakan periksa kotak masuk email Anda.",
+        );
       } else {
-        setError(msg || 'Gagal masuk. Silakan coba lagi.')
+        setError(msg || "Gagal masuk. Silakan coba lagi.");
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-[#071326] flex flex-col justify-between relative overflow-hidden text-slate-100">
@@ -77,19 +87,18 @@ export default function LoginPage() {
                 PT Besmindo Materi Sewatama
               </h1>
               <p className="text-blue-200 text-xs font-medium mt-1 tracking-wider uppercase">
-                TokenTrack — Sistem Monitoring Token
+                TokenTrack
               </p>
             </div>
 
             {/* Form Konten */}
             <div className="p-7 sm:p-8 bg-white">
               <div className="mb-6">
-                <h2 className="text-xl font-bold text-[#0c2144] tracking-tight">
-                  Masuk ke Akun
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">
-                  Gunakan email dan kata sandi Anda untuk mengakses sistem
-                </p>
+                <center>
+                  <h2 className="text-xl font-bold text-[#0c2144] tracking-tight">
+                    Masuk ke Akun
+                  </h2>
+                </center>
               </div>
 
               {/* Alert Error */}
@@ -106,7 +115,10 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Input Email */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">
+                  <Label
+                    htmlFor="email"
+                    className="text-sm font-medium text-slate-700"
+                  >
                     Alamat Email
                   </Label>
                   <div className="relative">
@@ -116,7 +128,9 @@ export default function LoginPage() {
                       type="email"
                       placeholder="email"
                       value={form.email}
-                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, email: e.target.value }))
+                      }
                       className="pl-10 h-11 border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0c2144] focus:ring-[#0c2144]/15"
                       required
                       autoComplete="email"
@@ -128,7 +142,10 @@ export default function LoginPage() {
                 {/* Input Password */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+                    <Label
+                      htmlFor="password"
+                      className="text-sm font-medium text-slate-700"
+                    >
                       Kata Sandi
                     </Label>
                   </div>
@@ -136,10 +153,12 @@ export default function LoginPage() {
                     <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
                       id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••"
                       value={form.password}
-                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, password: e.target.value }))
+                      }
                       className="pl-10 pr-10 h-11 border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0c2144] focus:ring-[#0c2144]/15"
                       required
                       autoComplete="current-password"
@@ -149,9 +168,17 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword((s) => !s)}
                       className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0c2144] focus:outline-none cursor-pointer"
-                      aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                      aria-label={
+                        showPassword
+                          ? "Sembunyikan kata sandi"
+                          : "Tampilkan kata sandi"
+                      }
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -168,26 +195,15 @@ export default function LoginPage() {
                       Memverifikasi...
                     </span>
                   ) : (
-                    'Masuk ke Sistem'
+                    "Masuk ke Sistem"
                   )}
                 </Button>
               </form>
-
-              {/* Link Daftar */}
-              <div className="mt-6 text-center text-sm text-slate-500">
-                Belum memiliki akun?{' '}
-                <Link
-                  to="/register"
-                  className="font-semibold text-[#0c2144] hover:text-[#194685] hover:underline transition-colors"
-                >
-                  Daftar sekarang
-                </Link>
-              </div>
             </div>
 
             {/* Footer Kartu */}
             <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#0c2144]" />
+              <span className="flex items-center gap-1">&gt;ࡇ&lt;</span>
             </div>
           </div>
         </div>
@@ -195,8 +211,9 @@ export default function LoginPage() {
 
       {/* Footer Bawah Halaman */}
       <footer className="text-center py-4 text-xs text-blue-300/60 z-10">
-        &copy; {new Date().getFullYear()} PT Besmindo Materi Sewatama. Untuk Kak Nisa.
+        &copy; {new Date().getFullYear()} PT Besmindo Materi Sewatama. Untuk Kak
+        Nisa.
       </footer>
     </div>
-  )
+  );
 }
