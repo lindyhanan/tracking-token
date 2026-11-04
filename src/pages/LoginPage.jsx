@@ -114,7 +114,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="nama@besmindo.com"
+                      placeholder="email"
                       value={form.email}
                       onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                       className="pl-10 h-11 border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0c2144] focus:ring-[#0c2144]/15"
