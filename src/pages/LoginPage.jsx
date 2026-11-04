@@ -188,7 +188,6 @@ export default function LoginPage() {
             {/* Footer Kartu */}
             <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-400">
               <ShieldCheck className="w-3.5 h-3.5 text-[#0c2144]" />
-              <span>Akses Terautentikasi &bull; Internal PT BMS</span>
             </div>
           </div>
         </div>
@@ -196,7 +195,7 @@ export default function LoginPage() {
 
       {/* Footer Bawah Halaman */}
       <footer className="text-center py-4 text-xs text-blue-300/60 z-10">
-        &copy; {new Date().getFullYear()} PT Besmindo Materi Sewatama. Hak Cipta Dilindungi.
+        &copy; {new Date().getFullYear()} PT Besmindo Materi Sewatama. Untuk Kak Nisa.
       </footer>
     </div>
   )
