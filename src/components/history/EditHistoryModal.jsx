@@ -88,7 +88,7 @@ export default function EditHistoryModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4 backdrop-blur-xs"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !saving) onClose()
       }}
@@ -97,7 +97,7 @@ export default function EditHistoryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${formId}-title`}
-        className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
@@ -109,9 +109,6 @@ export default function EditHistoryModal({
               <h2 id={`${formId}-title`} className="text-base font-semibold text-slate-900">
                 Edit Catatan Riwayat
               </h2>
-              <p className="text-xs text-slate-500">
-                Ubah rincian transaksi riwayat dan sinkronkan persediaan
-              </p>
             </div>
           </div>
           <button
@@ -125,8 +122,8 @@ export default function EditHistoryModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
                 {error}
@@ -177,7 +174,7 @@ export default function EditHistoryModal({
               <div>
                 <label htmlFor={`${formId}-action`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
                   <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                  Aksi yang Dilakukan <span className="text-red-500">*</span>
+                  Aksi<span className="text-red-500">*</span>
                 </label>
                 <select
                   id={`${formId}-action`}
@@ -186,8 +183,8 @@ export default function EditHistoryModal({
                   disabled={saving}
                   className={fieldClass}
                 >
-                  <option value="reduce">Pengurangan (Diambil)</option>
-                  <option value="add">Penambahan (Stok Masuk)</option>
+                  <option value="reduce">Pengurangan</option>
+                  <option value="add">Penambahan</option>
                 </select>
               </div>
             </div>
@@ -239,7 +236,7 @@ export default function EditHistoryModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6 sm:py-4">
             <p className="text-xs text-slate-400">
               * Stok persediaan di dashboard akan otomatis disesuaikan
             </p>

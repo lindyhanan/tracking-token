@@ -24,19 +24,19 @@ function StockCard({ title, value, total, icon: Icon }) {
   const percentage = total > 0 ? Math.round((value / total) * 100) : 0
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-xs hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
+          <p className="text-xs sm:text-sm font-medium text-slate-500">{title}</p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
             {numberFormat.format(value)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-[11px] sm:text-xs text-slate-500">
             dari {numberFormat.format(total)} total stok ({percentage}%)
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-blue-600">
-          <Icon className="h-5 w-5" aria-hidden="true" />
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 sm:p-2.5 text-blue-600">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
         </div>
       </div>
     </div>
@@ -117,7 +117,7 @@ export default function TokensPage() {
       {/* Judul halaman dan tindakan utama */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Manajemen Token
           </h1>
           <p className="mt-0.5 text-xs text-slate-500">Kelola daftar persediaan token, stok awal, dan penambahan</p>

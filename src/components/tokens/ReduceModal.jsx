@@ -101,14 +101,14 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${formId}-title`}
-        className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
       >
 
         {/* ── Header ── */}
@@ -135,8 +135,8 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="space-y-5 px-6 py-5">
+        <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
 
             {/* ── Info token ── */}
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
@@ -294,7 +294,7 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
           </div>
 
           {/* ── Footer ── */}
-          <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 rounded-b-xl">
+          <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:px-6 sm:py-4">
             <button
               type="button"
               onClick={onClose}

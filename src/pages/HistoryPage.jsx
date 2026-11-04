@@ -20,6 +20,107 @@ const actionConfig = {
   update: { label: 'Update',     icon: RefreshCw,    badge: 'info'   },
 }
 
+function HistoryTable({ title, type, rows, loading, formatDate, currentUserName, onEdit, onDelete }) {
+  const isAdd = type === 'add'
+  const total = rows.reduce((acc, h) => acc + Number(h.quantity_changed || 0), 0)
+  const qtyClass = isAdd ? 'text-emerald-600' : 'text-red-600'
+  const sign = isAdd ? '+' : '-'
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <p className="text-xs text-slate-500">
+          {rows.length} catatan · Total <span className={`font-semibold ${qtyClass}`}>{sign}{total.toLocaleString('id-ID')}</span>
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-400">Memuat riwayat...</p>
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-400">Belum ada riwayat {title.toLowerCase()}</p>
+      ) : (
+        <>
+          {/* HP: daftar ringkas */}
+          <ul className="divide-y divide-slate-100 sm:hidden">
+            {rows.map(h => (
+              <li key={h.id} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-800">{formatTokenLabel(h.token_type)}</p>
+                  <span className={`text-sm font-semibold tabular-nums ${qtyClass}`}>
+                    {sign}{Number(h.quantity_changed || 0).toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">{h.description || '-'}</p>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-slate-400">
+                    {formatDate(h.performed_at)} · {h.performer?.full_name || currentUserName}
+                  </p>
+                  <div className="flex items-center">
+                    <button type="button" onClick={() => onEdit(h)} title="Edit"
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 cursor-pointer">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => onDelete(h.id)} title="Hapus"
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 cursor-pointer">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* Laptop: tabel */}
+          <div className="hidden sm:block w-full overflow-x-auto">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-3 text-left">Tanggal</th>
+                  <th className="px-4 py-3 text-left">Jenis Token</th>
+                  <th className="px-4 py-3 text-right">Jumlah</th>
+                  <th className="px-4 py-3 text-left">Keterangan</th>
+                  <th className="px-4 py-3 text-left">Oleh</th>
+                  <th className="px-4 py-3 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map(h => (
+                  <tr key={h.id} className="hover:bg-slate-50/80">
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{formatDate(h.performed_at)}</td>
+                    <td className="px-4 py-3 text-slate-800 whitespace-nowrap">{formatTokenLabel(h.token_type)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold tabular-nums whitespace-nowrap ${qtyClass}`}>
+                      {sign}{Number(h.quantity_changed || 0).toLocaleString('id-ID')}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 max-w-[260px]">
+                      <span className="line-clamp-2 text-xs">{h.description || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-700 whitespace-nowrap">
+                      {h.performer?.full_name || currentUserName}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button type="button" onClick={() => onEdit(h)} title="Edit riwayat ini"
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 cursor-pointer">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => onDelete(h.id)} title="Hapus riwayat ini"
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 cursor-pointer">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
 export default function HistoryPage() {
   const { user, profile } = useAuth()
   const { history, stats, loading, fetchHistory, deleteHistory, updateHistory, clearAllHistory } = useTokens()
@@ -31,7 +132,6 @@ export default function HistoryPage() {
     'Pengguna'
 
   const [search, setSearch]           = useState('')
-  const [filterAction, setFilterAction] = useState('all')
   const [filterType, setFilterType]   = useState('all')
 
   const [deleteId, setDeleteId]       = useState(null)
@@ -45,16 +145,19 @@ export default function HistoryPage() {
   const [editItem, setEditItem] = useState(null)
   const [editError, setEditError] = useState('')
 
-  const filtered = (history || []).filter(h => {
-    const matchAction = filterAction === 'all' || h.action_type === filterAction
-    const matchType   = filterType   === 'all' || h.token_type  === filterType
+  // Filter berdasarkan jenis token & pencarian (berlaku untuk kedua tab)
+  const baseFiltered = (history || []).filter(h => {
+    const matchType   = filterType === 'all' || h.token_type === filterType
     const performer   = h.performer?.full_name || currentUserName
     const matchSearch =
       search === '' ||
       (h.description || '').toLowerCase().includes(search.toLowerCase()) ||
       performer.toLowerCase().includes(search.toLowerCase())
-    return matchAction && matchType && matchSearch
+    return matchType && matchSearch
   })
+
+  const addList    = baseFiltered.filter(h => h.action_type === 'add')
+  const reduceList = baseFiltered.filter(h => h.action_type === 'reduce')
 
   const formatDate = (iso) => {
     if (!iso) return '-'
@@ -109,11 +212,11 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Riwayat Perubahan</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Riwayat Perubahan</h1>
           <p className="mt-0.5 text-xs text-slate-500">Catatan seluruh penambahan, pengurangan, dan pengeditan token</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ExportHistory history={filtered} />
+          <ExportHistory history={baseFiltered} />
           {history.length > 0 && (
             <Button
               variant="outline"
@@ -143,130 +246,37 @@ export default function HistoryPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap sm:flex-nowrap gap-2">
-          <Select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full sm:w-40">
-            <option value="all">Semua Jenis</option>
-            {(stats?.list || []).map(item => (
-              <option key={item.type} value={item.type}>{item.label}</option>
-            ))}
-          </Select>
-          <Select value={filterAction} onChange={e => setFilterAction(e.target.value)} className="w-full sm:w-40">
-            <option value="all">Semua Aksi</option>
-            <option value="add">Penambahan</option>
-            <option value="reduce">Pengurangan</option>
-          </Select>
-        </div>
+        <Select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full sm:w-44">
+          <option value="all">Semua Jenis Token</option>
+          {(stats?.list || []).map(item => (
+            <option key={item.type} value={item.type}>{item.label}</option>
+          ))}
+        </Select>
       </div>
 
-      {/* Table */}
-      <Card className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Memuat riwayat...</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="p-12 text-center">
-              <Clock className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">Belum ada riwayat</p>
-              <p className="text-slate-400 text-sm mt-1">Riwayat akan muncul setelah ada aktivitas</p>
-            </div>
-          ) : (
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Waktu</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Jenis</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Aksi</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Jumlah</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Stok Sebelum</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Stok Sesudah</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Keterangan</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Oleh</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filtered.map(h => {
-                    const action      = actionConfig[h.action_type] || actionConfig.update
-                    const ActionIcon  = action.icon
-                    const Icon        = getTokenIcon(h.token_type)
-                    const label       = formatTokenLabel(h.token_type)
-                    const badgeVariant = getTokenBadgeVariant(h.token_type)
-                    return (
-                      <tr key={h.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3.5 text-slate-500 text-xs whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {formatDate(h.performed_at)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <Icon className="w-3.5 h-3.5 text-blue-600" />
-                            <Badge variant={badgeVariant}>{label}</Badge>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <ActionIcon className={`w-3.5 h-3.5 ${h.action_type === 'add' ? 'text-green-500' : 'text-red-500'}`} />
-                            <Badge variant={action.badge}>{action.label}</Badge>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <span className={`font-semibold ${h.action_type === 'add' ? 'text-green-600' : 'text-red-600'}`}>
-                            {h.action_type === 'reduce' ? '-' : '+'}{h.quantity_changed}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right text-slate-500">{h.stock_before}</td>
-                        <td className="px-4 py-3.5 text-right">
-                          <span className={h.stock_after < h.stock_before ? 'text-red-600 font-medium' : 'text-green-600 font-medium'}>
-                            {h.stock_after}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-slate-600 max-w-[200px]">
-                          <span className="line-clamp-2 text-xs leading-relaxed">{h.description || '-'}</span>
-                        </td>
-                        <td className="px-4 py-3.5 text-slate-700 text-xs font-medium whitespace-nowrap">
-                          {h.performer?.full_name || currentUserName}
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setEditItem(h)}
-                              className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
-                              title="Edit riwayat ini"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteId(h.id)}
-                              className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
-                              title="Hapus riwayat ini"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Tabel Penambahan */}
+      <HistoryTable
+        title="Penambahan"
+        type="add"
+        rows={addList}
+        loading={loading}
+        formatDate={formatDate}
+        currentUserName={currentUserName}
+        onEdit={setEditItem}
+        onDelete={setDeleteId}
+      />
 
-          {filtered.length > 0 && (
-            <div className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/50">
-              <p className="text-xs text-slate-400">{filtered.length} dari {history?.length || 0} riwayat</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabel Pengurangan */}
+      <HistoryTable
+        title="Pengurangan"
+        type="reduce"
+        rows={reduceList}
+        loading={loading}
+        formatDate={formatDate}
+        currentUserName={currentUserName}
+        onEdit={setEditItem}
+        onDelete={setDeleteId}
+      />
 
       {/* Dialog konfirmasi hapus */}
       {deleteId !== null && (
