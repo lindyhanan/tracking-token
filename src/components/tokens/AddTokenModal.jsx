@@ -1,11 +1,18 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Loader2, X, Plus } from 'lucide-react'
+import { Loader2, X, Plus, Calendar } from 'lucide-react'
 import { formatTokenLabel } from '@/lib/tokenUtils'
 
 const fieldClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 disabled:bg-slate-50 disabled:text-slate-500'
 
 const formatNumber = new Intl.NumberFormat('id-ID')
+
+function toDatetimeLocal(date) {
+  const d = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 /**
  * Modal untuk MENAMBAH STOK pada jenis token yang sudah ada.
@@ -17,6 +24,7 @@ export default function AddTokenModal({ open, onClose, onSubmit, availableTypes 
   const [selectedType, setSelectedType] = useState('')
   const [quantity, setQuantity] = useState('')
   const [description, setDescription] = useState('')
+  const [performedAt, setPerformedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -26,6 +34,7 @@ export default function AddTokenModal({ open, onClose, onSubmit, availableTypes 
     setSelectedType(defaultType)
     setQuantity('')
     setDescription('')
+    setPerformedAt(toDatetimeLocal(new Date()))
     setError('')
     const frame = requestAnimationFrame(() => qtyRef.current?.focus())
     return () => cancelAnimationFrame(frame)
@@ -55,6 +64,7 @@ export default function AddTokenModal({ open, onClose, onSubmit, availableTypes 
         token_type: selectedType,
         total_stock: numericQty,
         description: description.trim(),
+        performed_at: performedAt || new Date().toISOString(),
       })
       if (result?.error) throw new Error(result.error.message)
       onClose()
@@ -159,6 +169,24 @@ export default function AddTokenModal({ open, onClose, onSubmit, availableTypes 
                 disabled={saving}
                 className={fieldClass}
                 maxLength={200}
+              />
+            </div>
+
+            {/* Tanggal & Waktu */}
+            <div>
+              <label htmlFor={`${formId}-date`} className="block text-sm font-medium text-slate-700 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  Tanggal &amp; Waktu
+                </span>
+              </label>
+              <input
+                id={`${formId}-date`}
+                type="datetime-local"
+                value={performedAt}
+                onChange={(e) => setPerformedAt(e.target.value)}
+                disabled={saving}
+                className={fieldClass}
               />
             </div>
 

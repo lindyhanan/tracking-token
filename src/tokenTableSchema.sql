@@ -110,9 +110,10 @@ CREATE POLICY "Tokens: admin delete" ON public.tokens FOR DELETE TO authenticate
 CREATE POLICY "Tokens: member reduce" ON public.tokens FOR UPDATE TO authenticated
   USING (true) WITH CHECK (true);
 
--- History: semua authenticated user bisa baca, insert, dan delete
+-- History: semua authenticated user bisa baca, insert, update, dan delete
 CREATE POLICY "History: read" ON public.token_history FOR SELECT TO authenticated USING (true);
 CREATE POLICY "History: insert" ON public.token_history FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "History: update" ON public.token_history FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "History: delete" ON public.token_history FOR DELETE TO authenticated USING (true);
 
 -- ============================================================

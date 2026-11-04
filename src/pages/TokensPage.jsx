@@ -113,15 +113,16 @@ export default function TokensPage() {
   const hasFilters = search.trim() !== '' || filterType !== 'all'
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="space-y-6 pb-8 min-w-0">
       {/* Judul halaman dan tindakan utama */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Manajemen Token
           </h1>
+          <p className="mt-0.5 text-xs text-slate-500">Kelola daftar persediaan token, stok awal, dan penambahan</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -160,7 +161,7 @@ export default function TokensPage() {
 
       {/* Ringkasan persediaan DINAMIS: otomatis bertambah setiap ada jenis token baru */}
       <section
-        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0"
         aria-label="Ringkasan persediaan"
       >
         {(stats?.list || []).map((item) => {
@@ -195,31 +196,31 @@ export default function TokensPage() {
       )}
 
       {/* Filter dan tabel */}
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-base font-semibold text-slate-900">Daftar Persediaan</h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {numberFormat.format(filtered.length)} dari {numberFormat.format(tokens.length)} catatan stok
               </p>
             </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
-              <div className="relative w-full sm:min-w-[250px] lg:w-72">
+            <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
+              <div className="relative min-w-[200px] flex-1 sm:w-64">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   aria-label="Cari stok"
                   placeholder="Cari jenis atau keterangan..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  className="h-10 border-slate-300 pl-9 text-sm"
+                  className="h-9 border-slate-300 pl-9 text-xs"
                 />
               </div>
               <select
                 aria-label="Filter jenis stok"
                 value={filterType}
                 onChange={(event) => setFilterType(event.target.value)}
-                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 sm:w-44"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 sm:w-40"
               >
                 <option value="all">Semua jenis token</option>
                 {(stats?.list || []).map((item) => (
@@ -254,7 +255,7 @@ export default function TokensPage() {
             )}
           </div>
         ) : (
-          <div className="p-3 sm:p-4">
+          <div className="min-w-0">
             <TokenTable
               tokens={filtered}
               loading={loading}

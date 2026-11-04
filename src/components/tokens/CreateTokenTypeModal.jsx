@@ -1,8 +1,15 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Loader2, X, PlusCircle } from 'lucide-react'
+import { Loader2, X, PlusCircle, Calendar } from 'lucide-react'
 
 const fieldClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/10 disabled:bg-slate-50 disabled:text-slate-500'
+
+function toDatetimeLocal(date) {
+  const d = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 /**
  * Modal untuk MENAMBAH JENIS TOKEN BARU beserta stok awal.
@@ -14,6 +21,7 @@ export default function CreateTokenTypeModal({ open, onClose, onSubmit }) {
   const [name, setName] = useState('')
   const [initialStock, setInitialStock] = useState('')
   const [description, setDescription] = useState('')
+  const [performedAt, setPerformedAt] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -22,6 +30,7 @@ export default function CreateTokenTypeModal({ open, onClose, onSubmit }) {
     setName('')
     setInitialStock('')
     setDescription('')
+    setPerformedAt(toDatetimeLocal(new Date()))
     setError('')
     const frame = requestAnimationFrame(() => nameRef.current?.focus())
     return () => cancelAnimationFrame(frame)
@@ -56,6 +65,7 @@ export default function CreateTokenTypeModal({ open, onClose, onSubmit }) {
         total_stock: numericStock,
         description: description.trim(),
         isNewType: true,
+        performed_at: performedAt || new Date().toISOString(),
       })
       if (result?.error) throw new Error(result.error.message)
       onClose()
@@ -154,6 +164,24 @@ export default function CreateTokenTypeModal({ open, onClose, onSubmit }) {
                 disabled={saving}
                 className={fieldClass}
                 maxLength={200}
+              />
+            </div>
+
+            {/* Tanggal & Waktu */}
+            <div>
+              <label htmlFor={`${formId}-date`} className="block text-sm font-medium text-slate-700 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  Tanggal &amp; Waktu
+                </span>
+              </label>
+              <input
+                id={`${formId}-date`}
+                type="datetime-local"
+                value={performedAt}
+                onChange={(e) => setPerformedAt(e.target.value)}
+                disabled={saving}
+                className={fieldClass}
               />
             </div>
 

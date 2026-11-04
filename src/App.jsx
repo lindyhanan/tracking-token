@@ -6,6 +6,7 @@ import {
 } from 'react-router-dom'
 
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
+import { TokensProvider } from '@/hooks/useTokens'
 import AppLayout from '@/components/layout/AppLayout'
 
 import DashboardPage from '@/pages/DashboardPage'
@@ -100,7 +101,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <TokensProvider>
+          <AppRoutes />
+        </TokensProvider>
       </AuthProvider>
     </BrowserRouter>
   )

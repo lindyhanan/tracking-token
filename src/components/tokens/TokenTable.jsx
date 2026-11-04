@@ -19,8 +19,8 @@ export default function TokenTable({ tokens, onReduce, onDelete, loading }) {
     setReduceOpen(true)
   }
 
-  const handleReduceSubmit = async (quantity, description) => {
-    await onReduce(selectedToken, quantity, description)
+  const handleReduceSubmit = async (quantity, description, performedAt) => {
+    await onReduce(selectedToken, quantity, description, performedAt)
   }
 
   const handleSort = (field) => {
@@ -50,34 +50,29 @@ export default function TokenTable({ tokens, onReduce, onDelete, loading }) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-        <div className="p-12 text-center text-slate-400">
-          <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm">Memuat data token...</p>
-        </div>
+      <div className="w-full min-w-0 p-12 text-center text-slate-400">
+        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-sm">Memuat data token...</p>
       </div>
     )
   }
 
   if (tokens.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-        <div className="p-12 text-center">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Package className="w-7 h-7 text-slate-400" />
-          </div>
-          <p className="text-slate-600 font-medium">Belum ada data token</p>
-          <p className="text-slate-400 text-sm mt-1">Tambahkan stok token melalui tombol "Tambah Stok" atau "Tambah Jenis Token"</p>
+      <div className="w-full min-w-0 p-12 text-center">
+        <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+          <Package className="w-7 h-7 text-slate-400" />
         </div>
+        <p className="text-slate-600 font-medium">Belum ada data token</p>
+        <p className="text-slate-400 text-sm mt-1">Tambahkan stok token melalui tombol "Tambah Stok" atau "Tambah Jenis Token"</p>
       </div>
     )
   }
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="w-full min-w-0 overflow-x-auto">
+        <table className="w-full min-w-[650px] text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">No</th>
@@ -182,7 +177,6 @@ export default function TokenTable({ tokens, onReduce, onDelete, loading }) {
           <p className="text-xs text-slate-400">{tokens.length} entri data</p>
           <p className="text-xs text-slate-400">Klik tombol Kurangi untuk mencatat pengambilan</p>
         </div>
-      </div>
 
       <ReduceModal
         token={selectedToken}

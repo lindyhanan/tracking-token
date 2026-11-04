@@ -392,11 +392,11 @@ export default function DashboardPage() {
     }
   };
 
-  const handleReduce = async (qty, desc) => {
+  const handleReduce = async (qty, desc, performedAt) => {
     if (!selectedToken) return null;
     setActionError("");
     try {
-      const result = await reduceToken(selectedToken, qty, desc);
+      const result = await reduceToken(selectedToken, qty, desc, performedAt || null);
       setSelectedToken(null);
       return result;
     } catch (err) {

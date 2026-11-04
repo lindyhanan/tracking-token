@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, createContext, useContext, createElement } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
 import { formatTokenLabel } from '@/lib/tokenUtils'
+
+const TokensContext = createContext(null)
 
 // Menjaga kompatibilitas dengan komponen lama
 function normalizeToken(row) {
@@ -24,7 +26,7 @@ function normalizeHistory(row) {
   }
 }
 
-export function useTokens() {
+function useTokensValue() {
   const { user, profile } = useAuth()
 
   const [tokens, setTokens] = useState([])
@@ -129,11 +131,39 @@ export function useTokens() {
     refreshAll().catch(console.error)
   }, [user?.id, refreshAll])
 
+  // Sinkronisasi realtime dari Supabase agar dashboard langsung terupdate
+  useEffect(() => {
+    if (!user?.id) return
+
+    const channel = supabase
+      .channel('realtime-tokentrack-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'token_tracking' },
+        () => {
+          fetchTokens().catch(console.error)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'token_history' },
+        () => {
+          fetchHistory().catch(console.error)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, fetchTokens, fetchHistory])
+
   // Tambah stok atau buat jenis token baru
   const addToken = useCallback(async ({
     token_type,
     total_stock,
     description,
+    performed_at,
   }) => {
     try {
       if (!user?.id) {
@@ -150,49 +180,41 @@ export function useTokens() {
         throw new Error('Jumlah stok harus bilangan bulat positif lebih dari 0')
       }
 
-      // Cek apakah token dengan jenis ini sudah ada di tabel
-      const existingToken = tokens.find(
-        t => String(t.token_type || '').trim().toLowerCase() === normalizedType
+      // 1. Cek apakah token dengan jenis ini sudah ada di database
+      let targetToken = tokens.find(
+        (t) => String(t.token_type || '').trim().toLowerCase() === normalizedType
       )
+      if (!targetToken) {
+        const { data: dbToken } = await supabase
+          .from('token_tracking')
+          .select('*')
+          .ilike('token_type', normalizedType)
+          .maybeSingle()
+        targetToken = dbToken
+      }
 
-      if (existingToken) {
-        let rpcSuccess = false
-        // Jika token lama, coba lewat RPC terlebih dahulu
-        try {
-          const { error: rpcError } = await supabase.rpc('add_token_stock', {
-            p_token_type: normalizedType,
-            p_quantity: quantity,
+      let tokenId = targetToken?.id
+      let stockBefore = 0
+      let stockAfter = quantity
+
+      if (targetToken) {
+        // Token sudah ada: Tambahkan ke total_stock
+        const currentTotal = Number(targetToken.total_stock || 0)
+        const currentTaken = Number(targetToken.taken_quantity || 0)
+        stockBefore = Math.max(0, currentTotal - currentTaken)
+        const newTotal = currentTotal + quantity
+        stockAfter = stockBefore + quantity
+
+        const { error: updateError } = await supabase
+          .from('token_tracking')
+          .update({
+            total_stock: newTotal,
+            description: description || targetToken.description,
           })
-          if (!rpcError) rpcSuccess = true
-        } catch {
-          rpcSuccess = false
-        }
+          .eq('id', targetToken.id)
 
-        // Jika RPC tidak tersedia atau gagal, update baris langsung
-        if (!rpcSuccess) {
-          const newTotal = Number(existingToken.total_stock || 0) + quantity
-          const { error: updateError } = await supabase
-            .from('token_tracking')
-            .update({
-              total_stock: newTotal,
-              description: description || existingToken.description,
-            })
-            .eq('id', existingToken.id)
-
-          if (updateError) throw updateError
-
-          // Catat ke audit log riwayat
-          await supabase.from('token_history').insert({
-            token_id: existingToken.id,
-            token_type: normalizedType,
-            action_type: 'add',
-            quantity_changed: quantity,
-            stock_before: Number(existingToken.total_stock || 0) - Number(existingToken.taken_quantity || 0),
-            stock_after: newTotal - Number(existingToken.taken_quantity || 0),
-            description: description || 'Penambahan stok',
-            performed_by: user.id,
-          })
-        }
+        if (updateError) throw updateError
+        tokenId = targetToken.id
       } else {
         // Jenis token baru: Tambahkan baris baru ke tabel
         const { data: inserted, error: insertError } = await supabase
@@ -208,18 +230,62 @@ export function useTokens() {
           .single()
 
         if (insertError) throw insertError
+        tokenId = inserted?.id
+        stockBefore = 0
+        stockAfter = quantity
+      }
 
-        // Catat ke audit log riwayat
-        await supabase.from('token_history').insert({
-          token_id: inserted?.id,
+      // 2. Catat ke riwayat (token_history) secara pasti
+      const nowIso = performed_at ? new Date(performed_at).toISOString() : new Date().toISOString()
+      const historyRecord = {
+        token_id: tokenId || null,
+        token_type: normalizedType,
+        action_type: 'add',
+        quantity_changed: quantity,
+        stock_before: stockBefore,
+        stock_after: stockAfter,
+        description: description || (targetToken ? `Penambahan stok: +${quantity} unit` : `Penambahan jenis token baru: ${formatTokenLabel(normalizedType)}`),
+        performed_by: user.id,
+        performed_at: nowIso,
+      }
+
+      let insertResult = await supabase.from('token_history').insert(historyRecord).select()
+
+      if (insertResult.error) {
+        console.warn('Gagal insert token_history penambahan dengan relasi, mencoba fallback:', insertResult.error)
+        // Fallback 1: tanpa token_id jika foreign key token bermasalah
+        insertResult = await supabase.from('token_history').insert({
+          ...historyRecord,
+          token_id: null,
+        }).select()
+      }
+
+      if (insertResult.error) {
+        console.warn('Gagal insert token_history tanpa token_id, mencoba fallback minimal:', insertResult.error)
+        // Fallback 2: tanpa token_id dan performed_by jika foreign key profiles bermasalah
+        insertResult = await supabase.from('token_history').insert({
           token_type: normalizedType,
           action_type: 'add',
           quantity_changed: quantity,
-          stock_before: 0,
-          stock_after: quantity,
-          description: description || `Penambahan jenis token baru: ${formatTokenLabel(normalizedType)}`,
-          performed_by: user.id,
-        })
+          stock_before: stockBefore,
+          stock_after: stockAfter,
+          description: historyRecord.description,
+          performed_at: nowIso,
+        }).select()
+      }
+
+      if (insertResult.error) {
+        console.error('Semua percobaan insert ke token_history gagal:', insertResult.error)
+        throw new Error(`Gagal mencatat ke riwayat: ${insertResult.error.message || 'Izin database RLS ditolak'}`)
+      }
+
+      // Update state history seketika
+      if (insertResult.data && insertResult.data[0]) {
+        const newHist = {
+          ...normalizeHistory(insertResult.data[0]),
+          performer: { full_name: currentUserName },
+        }
+        setHistory((prev) => [newHist, ...prev])
       }
 
       await refreshAll()
@@ -228,13 +294,14 @@ export function useTokens() {
       setError(err.message)
       throw err
     }
-  }, [user?.id, tokens, refreshAll])
+  }, [user?.id, tokens, refreshAll, currentUserName])
 
   // Kurangi stok melalui fungsi database yang atomik
   const reduceToken = useCallback(async (
     token,
     quantity,
-    description = ''
+    description = '',
+    performed_at = null
   ) => {
     try {
       if (!user?.id) {
@@ -250,63 +317,188 @@ export function useTokens() {
         throw new Error('Jumlah harus bilangan bulat positif')
       }
 
-      let rpcSuccess = false
-      try {
-        const { error: dbError } = await supabase.rpc(
-          'reduce_token_stock',
-          {
-            p_token_id: String(token.id),
-            p_quantity: qty,
-            p_description: description || '',
-          }
-        )
-        if (!dbError) rpcSuccess = true
-      } catch {
-        rpcSuccess = false
+      const currentTaken = Number(token.taken_quantity || 0)
+      const currentTotal = Number(token.total_stock || 0)
+      const remaining = Math.max(0, currentTotal - currentTaken)
+
+      if (qty > remaining) {
+        throw new Error(`Jumlah pengambilan melebihi sisa stok (${remaining} unit)`)
       }
 
-      // Fallback jika RPC reduce_token_stock tidak ada
-      if (!rpcSuccess) {
-        const currentTaken = Number(token.taken_quantity || 0)
-        const currentTotal = Number(token.total_stock || 0)
-        const remaining = Math.max(0, currentTotal - currentTaken)
+      const newTaken = currentTaken + qty
+      const { error: updateError } = await supabase
+        .from('token_tracking')
+        .update({ taken_quantity: newTaken })
+        .eq('id', token.id)
 
-        if (qty > remaining) {
-          throw new Error(`Jumlah pengambilan melebihi sisa stok (${remaining} unit)`)
-        }
+      if (updateError) throw updateError
 
-        const newTaken = currentTaken + qty
-        const { error: updateError } = await supabase
-          .from('token_tracking')
-          .update({ taken_quantity: newTaken })
-          .eq('id', token.id)
+      // Update state token seketika
+      setTokens((prev) =>
+        prev.map((t) =>
+          String(t.id) === String(token.id)
+            ? { ...t, taken_quantity: newTaken }
+            : t
+        )
+      )
 
-        if (updateError) throw updateError
+      // Catat ke riwayat token_history secara pasti
+      const nowIso = performed_at ? new Date(performed_at).toISOString() : new Date().toISOString()
+      const historyRecord = {
+        token_id: token.id || null,
+        token_type: token.token_type,
+        action_type: 'reduce',
+        quantity_changed: qty,
+        stock_before: remaining,
+        stock_after: remaining - qty,
+        description: description || 'Pengambilan token',
+        performed_by: user.id,
+        performed_at: nowIso,
+      }
 
-        await supabase.from('token_history').insert({
-          token_id: token.id,
+      let insertResult = await supabase.from('token_history').insert(historyRecord).select()
+
+      if (insertResult.error) {
+        console.warn('Gagal insert token_history pengurangan dengan relasi, mencoba fallback:', insertResult.error)
+        // Fallback 1: tanpa token_id
+        insertResult = await supabase.from('token_history').insert({
+          ...historyRecord,
+          token_id: null,
+        }).select()
+      }
+
+      if (insertResult.error) {
+        console.warn('Gagal insert token_history tanpa token_id, mencoba fallback minimal:', insertResult.error)
+        // Fallback 2: tanpa token_id dan performed_by
+        insertResult = await supabase.from('token_history').insert({
           token_type: token.token_type,
           action_type: 'reduce',
           quantity_changed: qty,
           stock_before: remaining,
           stock_after: remaining - qty,
           description: description || 'Pengambilan token',
-          performed_by: user.id,
-        })
+          performed_at: nowIso,
+        }).select()
+      }
+
+      if (insertResult.error) {
+        console.error('Semua percobaan insert pengurangan ke token_history gagal:', insertResult.error)
+        throw new Error(`Gagal mencatat pengambilan ke riwayat: ${insertResult.error.message || 'Izin database RLS ditolak'}`)
+      }
+
+      // Update state history seketika
+      if (insertResult.data && insertResult.data[0]) {
+        const newHist = {
+          ...normalizeHistory(insertResult.data[0]),
+          performer: { full_name: currentUserName },
+        }
+        setHistory((prev) => [newHist, ...prev])
       }
 
       await refreshAll()
+      return { success: true }
     } catch (err) {
       setError(err.message)
       throw err
     }
-  }, [user?.id, refreshAll])
+  }, [user?.id, refreshAll, currentUserName])
 
-  // Hapus satu entri riwayat
+  // Hapus satu entri riwayat dan kembalikan stok dashboard ke kondisi sebelum diubah
   const deleteHistory = useCallback(async (historyId) => {
     try {
       if (!user?.id) throw new Error('Pengguna belum login')
 
+      // 1. Dapatkan entri riwayat yang ingin dihapus
+      let targetHistory = history.find((h) => String(h.id) === String(historyId))
+      if (!targetHistory) {
+        const { data: fetchedHist } = await supabase
+          .from('token_history')
+          .select('*')
+          .eq('id', historyId)
+          .maybeSingle()
+        targetHistory = fetchedHist
+      }
+
+      if (!targetHistory) {
+        throw new Error('Data riwayat tidak ditemukan')
+      }
+
+      // 2. Temukan data token yang bersangkutan (dari memory atau database)
+      const hType = String(targetHistory.token_type || '').trim().toLowerCase()
+      const hTypeAlt = hType === 'glass' ? 'gelas' : hType === 'gelas' ? 'glass' : hType
+
+      // Cari di state tokens terlebih dahulu
+      let tokenRow = tokens.find((t) => {
+        const idMatches = targetHistory.token_id && String(t.id) === String(targetHistory.token_id)
+        const tType = String(t.token_type || '').trim().toLowerCase()
+        return idMatches || tType === hType || tType === hTypeAlt
+      })
+
+      // Jika belum ditemukan di state, cari langsung dari database
+      if (!tokenRow) {
+        const { data: d1 } = await supabase.from('token_tracking').select('*')
+        if (d1 && d1.length > 0) {
+          tokenRow = d1.find((t) => {
+            const idMatches = targetHistory.token_id && String(t.id) === String(targetHistory.token_id)
+            const tType = String(t.token_type || '').trim().toLowerCase()
+            return idMatches || tType === hType || tType === hTypeAlt
+          })
+        }
+      }
+      if (!tokenRow) {
+        const { data: d2 } = await supabase.from('tokens').select('*')
+        if (d2 && d2.length > 0) {
+          tokenRow = d2.find((t) => {
+            const idMatches = targetHistory.token_id && String(t.id) === String(targetHistory.token_id)
+            const tType = String(t.token_type || '').trim().toLowerCase()
+            return idMatches || tType === hType || tType === hTypeAlt
+          })
+        }
+      }
+
+      // 3. Rollback stok: jika transaksi gajadi/dihapus, kembalikan persediaan ke semula
+      if (tokenRow) {
+        const qty = Number(targetHistory.quantity_changed || 0)
+
+        if (targetHistory.action_type === 'reduce') {
+          // PENGURANGAN BATAL / GAJADI DIAMBIL:
+          // Kurangi taken_quantity sebesar qty (misal 10 - 10 = 0)
+          // Sehingga "Diambil" kembali ke 0, dan sisa stok kembali utuh!
+          const currentTaken = Number(tokenRow.taken_quantity || 0)
+          const revertedTaken = Math.max(0, currentTaken - qty)
+
+          // Update database token_tracking dan tokens
+          await supabase.from('token_tracking').update({ taken_quantity: revertedTaken }).eq('id', tokenRow.id)
+          await supabase.from('tokens').update({ taken_quantity: revertedTaken }).eq('id', tokenRow.id)
+
+          // Update state lokal seketika
+          setTokens((prev) =>
+            prev.map((t) =>
+              String(t.id) === String(tokenRow.id) || String(t.token_type).trim().toLowerCase() === hType
+                ? { ...t, taken_quantity: revertedTaken }
+                : t
+            )
+          )
+        } else if (targetHistory.action_type === 'add') {
+          // PENAMBAHAN BATAL:
+          // Kurangi total_stock sebesar qty
+          const currentTotal = Number(tokenRow.total_stock || 0)
+          const revertedTotal = Math.max(0, currentTotal - qty)
+
+          await supabase.from('token_tracking').update({ total_stock: revertedTotal }).eq('id', tokenRow.id)
+          await supabase.from('tokens').update({ total_stock: revertedTotal }).eq('id', tokenRow.id)
+
+          setTokens((prev) =>
+            prev.map((t) =>
+              String(t.id) === String(tokenRow.id) || String(t.token_type).trim().toLowerCase() === hType
+                ? { ...t, total_stock: revertedTotal }
+                : t
+            )
+          )
+        }
+      }
+
+      // 4. Hapus entri riwayat dari tabel token_history
       const { data, error: dbError } = await supabase
         .from('token_history')
         .delete()
@@ -315,24 +507,198 @@ export function useTokens() {
 
       if (dbError) throw dbError
 
-      if (!data?.length) {
-        throw new Error('Gagal menghapus: Supabase RLS belum mengizinkan DELETE pada tabel token_history. Jalankan query fix_history_delete_policy.sql di Supabase SQL Editor.')
-      }
+      // Hapus dari state riwayat seketika
+      setHistory((prev) => prev.filter((h) => String(h.id) !== String(historyId)))
 
-      // Perbarui state lokal tanpa re-fetch penuh
-      setHistory((prev) => prev.filter((h) => h.id !== historyId))
+      // 5. Sinkronkan seluruh data di background
+      await refreshAll()
       return { success: true }
     } catch (err) {
       setError(err.message)
       throw err
     }
-  }, [user?.id])
+  }, [user?.id, history, tokens, refreshAll])
 
-  // Hapus semua entri riwayat (kosongkan seluruh tabel riwayat)
+  // Edit satu entri riwayat dan sesuaikan stok dashboard secara otomatis
+  const updateHistory = useCallback(async (historyId, updatedData) => {
+    try {
+      if (!user?.id) throw new Error('Pengguna belum login')
+
+      // 1. Ambil data riwayat lama
+      let oldHistory = history.find((h) => String(h.id) === String(historyId))
+      if (!oldHistory) {
+        const { data: fetched } = await supabase.from('token_history').select('*').eq('id', historyId).maybeSingle()
+        oldHistory = fetched
+      }
+      if (!oldHistory) throw new Error('Data riwayat tidak ditemukan')
+
+      // 2. Ambil seluruh data token terbaru dari database
+      const { data: allTokensDb } = await supabase.from('token_tracking').select('*')
+      const currentTokens = allTokensDb || tokens
+
+      // Helper mencari token berdasarkan type atau id
+      const findTokenByType = (typeStr, tokenId) => {
+        const tType = String(typeStr || '').trim().toLowerCase()
+        const altType = tType === 'glass' ? 'gelas' : tType === 'gelas' ? 'glass' : tType
+        return currentTokens.find((t) => {
+          const idMatch = tokenId && String(t.id) === String(tokenId)
+          const typeMatch = String(t.token_type || '').trim().toLowerCase()
+          return idMatch || typeMatch === tType || typeMatch === altType
+        })
+      }
+
+      const oldToken = findTokenByType(oldHistory.token_type, oldHistory.token_id)
+      const oldQty = Number(oldHistory.quantity_changed || 0)
+      const newQty = Number(updatedData.quantity_changed || 0)
+
+      // 3. Batalkan dampak transaksi lama pada stok
+      if (oldToken) {
+        if (oldHistory.action_type === 'reduce') {
+          // Batal ambil lama: taken_quantity dikurangi oldQty
+          const currentTaken = Number(oldToken.taken_quantity || 0)
+          const revertedTaken = Math.max(0, currentTaken - oldQty)
+          oldToken.taken_quantity = revertedTaken
+          await supabase.from('token_tracking').update({ taken_quantity: revertedTaken }).eq('id', oldToken.id)
+          await supabase.from('tokens').update({ taken_quantity: revertedTaken }).eq('id', oldToken.id)
+        } else if (oldHistory.action_type === 'add') {
+          // Batal tambah lama: total_stock dikurangi oldQty
+          const currentTotal = Number(oldToken.total_stock || 0)
+          const revertedTotal = Math.max(0, currentTotal - oldQty)
+          oldToken.total_stock = revertedTotal
+          await supabase.from('token_tracking').update({ total_stock: revertedTotal }).eq('id', oldToken.id)
+          await supabase.from('tokens').update({ total_stock: revertedTotal }).eq('id', oldToken.id)
+        }
+      }
+
+      // 4. Terapkan dampak transaksi baru pada stok
+      const newToken = findTokenByType(updatedData.token_type, null) || oldToken
+
+      let stockBefore = 0
+      let stockAfter = 0
+
+      if (newToken) {
+        const curTotal = Number(newToken.total_stock || 0)
+        const curTaken = Number(newToken.taken_quantity || 0)
+        const curRemaining = Math.max(0, curTotal - curTaken)
+
+        if (updatedData.action_type === 'reduce') {
+          // Terapkan pengambilan baru: taken_quantity ditambah newQty
+          const appliedTaken = curTaken + newQty
+          stockBefore = curRemaining
+          stockAfter = Math.max(0, curRemaining - newQty)
+
+          await supabase.from('token_tracking').update({ taken_quantity: appliedTaken }).eq('id', newToken.id)
+          await supabase.from('tokens').update({ taken_quantity: appliedTaken }).eq('id', newToken.id)
+        } else if (updatedData.action_type === 'add') {
+          // Terapkan penambahan baru: total_stock ditambah newQty
+          const appliedTotal = curTotal + newQty
+          stockBefore = curRemaining
+          stockAfter = curRemaining + newQty
+
+          await supabase.from('token_tracking').update({ total_stock: appliedTotal }).eq('id', newToken.id)
+          await supabase.from('tokens').update({ total_stock: appliedTotal }).eq('id', newToken.id)
+        }
+      }
+
+      // 5. Update data di tabel token_history
+      const historyUpdate = {
+        token_id: newToken?.id || oldHistory.token_id || null,
+        token_type: updatedData.token_type,
+        action_type: updatedData.action_type,
+        quantity_changed: newQty,
+        description: updatedData.description || null,
+        performed_at: updatedData.performed_at,
+        stock_before: stockBefore,
+        stock_after: stockAfter,
+      }
+
+      const { error: updateHistErr } = await supabase
+        .from('token_history')
+        .update(historyUpdate)
+        .eq('id', historyId)
+
+      if (updateHistErr) throw updateHistErr
+
+      // 6. Update state lokal seketika
+      setHistory((prev) =>
+        prev.map((h) =>
+          String(h.id) === String(historyId)
+            ? { ...h, ...historyUpdate }
+            : h
+        )
+      )
+
+      await refreshAll()
+      return { success: true }
+    } catch (err) {
+      setError(err.message)
+      throw err
+    }
+  }, [user?.id, history, tokens, refreshAll])
+
+  // Hapus semua entri riwayat dan kembalikan seluruh stok dashboard ke setelan awal
   const clearAllHistory = useCallback(async () => {
     try {
       if (!user?.id) throw new Error('Pengguna belum login')
 
+      // 1. Ambil seluruh riwayat saat ini untuk menghitung total rollback stok
+      const { data: allHistory, error: histError } = await supabase
+        .from('token_history')
+        .select('*')
+
+      if (histError) throw histError
+
+      // 2. Ambil seluruh data stok token
+      const { data: allTokens, error: tokError } = await supabase
+        .from('token_tracking')
+        .select('*')
+
+      if (tokError) throw tokError
+
+      // 3. Rollback seluruh perubahan stok berdasarkan riwayat yang akan dihapus
+      if (allTokens && allHistory && allHistory.length > 0) {
+        for (const token of allTokens) {
+          const tokenHistories = allHistory.filter((h) =>
+            (h.token_id && String(h.token_id) === String(token.id)) ||
+            (h.token_type && String(h.token_type).trim().toLowerCase() === String(token.token_type).trim().toLowerCase())
+          )
+
+          let netTotalDelta = 0
+          let netTakenDelta = 0
+
+          for (const h of tokenHistories) {
+            const qty = Number(h.quantity_changed || 0)
+            if (h.action_type === 'add') {
+              netTotalDelta += qty
+            } else if (h.action_type === 'reduce') {
+              netTakenDelta += qty
+            }
+          }
+
+          const restoredTotal = Math.max(0, Number(token.total_stock || 0) - netTotalDelta)
+          const restoredTaken = Math.max(0, Number(token.taken_quantity || 0) - netTakenDelta)
+
+          if (netTotalDelta !== 0 || netTakenDelta !== 0) {
+            await supabase
+              .from('token_tracking')
+              .update({
+                total_stock: restoredTotal,
+                taken_quantity: restoredTaken,
+              })
+              .eq('id', token.id)
+
+            await supabase
+              .from('tokens')
+              .update({
+                total_stock: restoredTotal,
+                taken_quantity: restoredTaken,
+              })
+              .eq('id', token.id)
+          }
+        }
+      }
+
+      // 4. Hapus seluruh data di tabel riwayat
       const { data, error: dbError } = await supabase
         .from('token_history')
         .delete()
@@ -345,13 +711,14 @@ export function useTokens() {
         throw new Error('Supabase RLS belum mengizinkan aksi DELETE pada tabel token_history. Pastikan query fix_history_delete_policy.sql sudah dijalankan di Supabase SQL Editor.')
       }
 
-      setHistory([])
+      // 5. Refresh seluruh data agar dashboard langsung menampilkan setelan awal
+      await refreshAll()
       return { success: true }
     } catch (err) {
       setError(err.message)
       throw err
     }
-  }, [user?.id, history.length])
+  }, [user?.id, history.length, refreshAll])
 
   // Hapus stok jika diizinkan
   const deleteToken = useCallback(async (tokenId) => {
@@ -487,6 +854,18 @@ export function useTokens() {
     reduceToken,
     deleteToken,
     deleteHistory,
+    updateHistory,
     clearAllHistory,
   }
+}
+
+export function TokensProvider({ children }) {
+  const value = useTokensValue()
+  return createElement(TokensContext.Provider, { value }, children)
+}
+
+export function useTokens() {
+  const context = useContext(TokensContext)
+  if (context) return context
+  return useTokensValue()
 }

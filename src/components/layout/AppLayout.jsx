@@ -8,12 +8,12 @@ export default function AppLayout() {
       {/* Sidebar on the left */}
       <Sidebar />
 
-      {/* Main content area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main content area — min-w-0 allows flex item to shrink below its natural width */}
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
         <Header />
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
+        <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

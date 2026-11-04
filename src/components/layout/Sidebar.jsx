@@ -24,13 +24,12 @@ export default function Sidebar() {
   }
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Pengguna'
-  const displayRole = profile?.role || 'member'
 
   return (
-    <aside className="flex-shrink-0 w-60 bg-slate-900 flex flex-col">
+    <aside className="w-60 shrink-0 bg-slate-900 flex flex-col">
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
-        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
           <img
             src="/LOGO BMS.avif"
             alt="Logo TokenTrack"
@@ -97,7 +96,6 @@ export default function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-slate-200 text-xs font-medium truncate">{displayName}</p>
-            <p className="text-slate-500 text-xs capitalize">{displayRole}</p>
           </div>
         </div>
         <button

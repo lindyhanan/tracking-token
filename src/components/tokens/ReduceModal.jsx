@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Loader2, X, Minus, Package, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Loader2, X, Minus, Package, AlertCircle, CheckCircle2, Calendar } from 'lucide-react'
 import { formatTokenLabel, getTokenIcon } from '@/lib/tokenUtils'
 
 const fieldClass =
@@ -7,12 +7,20 @@ const fieldClass =
 
 const fmt = new Intl.NumberFormat('id-ID')
 
+function toDatetimeLocal(date) {
+  const d = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function ReduceModal({ open, token, onClose, onSubmit }) {
   const formId      = useId()
   const quantityRef = useRef(null)
 
   const [quantity,    setQuantity]    = useState('')
   const [description, setDescription] = useState('')
+  const [performedAt, setPerformedAt] = useState('')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
 
@@ -44,6 +52,7 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
     if (!open) return
     setQuantity('')
     setDescription('')
+    setPerformedAt(toDatetimeLocal(new Date()))
     setError('')
     const frame = requestAnimationFrame(() => quantityRef.current?.focus())
     return () => cancelAnimationFrame(frame)
@@ -78,7 +87,7 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
 
     setSaving(true)
     try {
-      const result = await onSubmit(numericQty, description.trim())
+      const result = await onSubmit(numericQty, description.trim(), performedAt || null)
       if (result === false || result?.error) {
         throw new Error(result?.error?.message || 'Pengambilan belum berhasil disimpan.')
       }
@@ -255,6 +264,24 @@ export default function ReduceModal({ open, token, onClose, onSubmit }) {
                 <p className="text-xs text-slate-400">Jelaskan alasan atau tujuan pengambilan token</p>
                 <p className="text-xs text-slate-400">{description.length}/250</p>
               </div>
+            </div>
+
+            {/* ── Tanggal & Waktu ── */}
+            <div>
+              <label htmlFor={`${formId}-date`} className="block text-sm font-medium text-slate-700 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  Tanggal &amp; Waktu
+                </span>
+              </label>
+              <input
+                id={`${formId}-date`}
+                type="datetime-local"
+                value={performedAt}
+                onChange={(e) => setPerformedAt(e.target.value)}
+                disabled={saving}
+                className={fieldClass}
+              />
             </div>
 
             {/* ── Error ── */}

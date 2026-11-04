@@ -49,7 +49,7 @@ export default function ExportHistory({ history }) {
 
   return (
     <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 border-slate-300">
-      <Download className="h-4 w-4" /> Export CSV
+      <Download className="h-4 w-4" /> Export Excel
     </Button>
   )
 }
