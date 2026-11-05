@@ -88,7 +88,7 @@ export default function EditHistoryModal({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-[120] flex justify-center overflow-y-auto overscroll-contain bg-slate-950/50 p-3 sm:p-4 backdrop-blur-xs"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !saving) onClose()
       }}
@@ -97,7 +97,7 @@ export default function EditHistoryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${formId}-title`}
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+        className="my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">

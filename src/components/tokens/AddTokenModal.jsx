@@ -77,17 +77,17 @@ export default function AddTokenModal({ open, onClose, onSubmit, availableTypes 
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4"
+      className="fixed inset-0 z-[100] flex justify-center overflow-y-auto overscroll-contain bg-slate-950/50 p-3 sm:p-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose() }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${formId}-title`}
-        className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+        className="my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md shrink-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           <div>
             <h2 id={`${formId}-title`} className="text-base font-semibold text-slate-900">
               Tambah Stok Token
