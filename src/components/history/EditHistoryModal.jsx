@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from 'react'
-import { Loader2, X, Pencil, Calendar, Package, ArrowUpDown, FileText, Hash } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Loader2, X, Pencil, Calendar } from 'lucide-react'
 import { formatTokenLabel } from '@/lib/tokenUtils'
+import DateTimePicker from '@/components/ui/datetime-picker'
 
 const fieldClass =
-  'w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 disabled:bg-slate-50 disabled:text-slate-500'
+  'w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 disabled:bg-slate-50 disabled:text-slate-500'
 
 function toDatetimeLocal(isoString) {
   if (!isoString) return ''
@@ -21,6 +22,7 @@ export default function EditHistoryModal({
   availableTypes = [],
 }) {
   const formId = useId()
+  const prevOpenRef = useRef(false)
 
   const [form, setForm] = useState({
     performed_at: '',
@@ -33,15 +35,18 @@ export default function EditHistoryModal({
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!open || !historyItem) return
-    setForm({
-      performed_at: toDatetimeLocal(historyItem.performed_at) || toDatetimeLocal(new Date().toISOString()),
-      token_type: historyItem.token_type || availableTypes[0] || 'tumbler',
-      action_type: historyItem.action_type || 'reduce',
-      quantity_changed: String(historyItem.quantity_changed || 1),
-      description: historyItem.description || '',
-    })
-    setError('')
+    if (open && historyItem && !prevOpenRef.current) {
+      setForm({
+        performed_at:
+          toDatetimeLocal(historyItem.performed_at) || toDatetimeLocal(new Date().toISOString()),
+        token_type: historyItem.token_type || availableTypes[0] || 'tumbler',
+        action_type: historyItem.action_type || 'reduce',
+        quantity_changed: String(historyItem.quantity_changed || 1),
+        description: historyItem.description || '',
+      })
+      setError('')
+    }
+    prevOpenRef.current = open
   }, [open, historyItem, availableTypes])
 
   useEffect(() => {
@@ -83,12 +88,11 @@ export default function EditHistoryModal({
     }
   }
 
-  // Gabungkan jenis token unik dari availableTypes dan token_type item saat ini
   const allTypes = Array.from(new Set([...availableTypes, historyItem.token_type].filter(Boolean)))
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex justify-center overflow-y-auto overscroll-contain bg-slate-950/50 p-3 sm:p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/50 p-3"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !saving) onClose()
       }}
@@ -97,62 +101,42 @@ export default function EditHistoryModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${formId}-title`}
-        className="my-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-lg shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+        className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
+        {/* Header ringkas */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <Pencil className="h-4 w-4" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Pencil className="h-3.5 w-3.5" />
             </div>
-            <div>
-              <h2 id={`${formId}-title`} className="text-base font-semibold text-slate-900">
-                Edit Catatan Riwayat
-              </h2>
-            </div>
+            <h2 id={`${formId}-title`} className="text-sm font-semibold text-slate-900">
+              Edit Catatan Riwayat
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 cursor-pointer"
+            aria-label="Tutup"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50 cursor-pointer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-3.5">
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 {error}
               </div>
             )}
 
-            {/* Waktu Transaksi */}
-            <div>
-              <label htmlFor={`${formId}-waktu`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                Waktu Transaksi <span className="text-red-500">*</span>
-              </label>
-              <input
-                id={`${formId}-waktu`}
-                type="datetime-local"
-                value={form.performed_at}
-                onChange={(e) => setForm((f) => ({ ...f, performed_at: e.target.value }))}
-                disabled={saving}
-                className={fieldClass}
-                required
-              />
-            </div>
-
             {/* Grid 2 Kolom: Jenis Token & Aksi */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {/* Jenis Token */}
+            <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <label htmlFor={`${formId}-type`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-slate-400" />
+                <label htmlFor={`${formId}-type`} className="block text-xs font-medium text-slate-700 mb-1">
                   Jenis Token <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -170,11 +154,9 @@ export default function EditHistoryModal({
                 </select>
               </div>
 
-              {/* Aksi */}
               <div>
-                <label htmlFor={`${formId}-action`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                  Aksi<span className="text-red-500">*</span>
+                <label htmlFor={`${formId}-action`} className="block text-xs font-medium text-slate-700 mb-1">
+                  Aksi <span className="text-red-500">*</span>
                 </label>
                 <select
                   id={`${formId}-action`}
@@ -191,8 +173,7 @@ export default function EditHistoryModal({
 
             {/* Jumlah Unit */}
             <div>
-              <label htmlFor={`${formId}-qty`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-                <Hash className="w-3.5 h-3.5 text-slate-400" />
+              <label htmlFor={`${formId}-qty`} className="block text-xs font-medium text-slate-700 mb-1">
                 Jumlah Unit <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -200,31 +181,37 @@ export default function EditHistoryModal({
                   id={`${formId}-qty`}
                   type="text"
                   inputMode="numeric"
-                  placeholder="Masukkan jumlah unit"
+                  placeholder="Masukkan jumlah unit..."
                   value={form.quantity_changed}
-                  onChange={(e) => setForm((f) => ({ ...f, quantity_changed: e.target.value.replace(/\D/g, '') }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      quantity_changed: e.target.value.replace(/\D/g, ''),
+                    }))
+                  }
                   disabled={saving}
-                  className={`${fieldClass} pr-14`}
+                  className={`${fieldClass} pr-12`}
                   required
                 />
-                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">
                   unit
                 </span>
               </div>
               {!isValidQty && form.quantity_changed && (
-                <p className="mt-1 text-xs text-red-500">Jumlah harus berupa bilangan bulat positif lebih dari 0.</p>
+                <p className="mt-1 text-[11px] text-red-500">
+                  Jumlah harus bilangan bulat lebih dari 0.
+                </p>
               )}
             </div>
 
             {/* Keterangan */}
             <div>
-              <label htmlFor={`${formId}-desc`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-slate-400" />
+              <label htmlFor={`${formId}-desc`} className="block text-xs font-medium text-slate-700 mb-1">
                 Keterangan
               </label>
               <textarea
                 id={`${formId}-desc`}
-                rows={3}
+                rows={2}
                 placeholder="Tuliskan keterangan aktivitas..."
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -233,34 +220,48 @@ export default function EditHistoryModal({
                 maxLength={250}
               />
             </div>
+
+            {/* Waktu Transaksi */}
+            <div>
+              <label
+                htmlFor={`${formId}-waktu`}
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-700 mb-1"
+              >
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                Tanggal &amp; Waktu <span className="text-red-500">*</span>
+              </label>
+              <DateTimePicker
+                id={`${formId}-waktu`}
+                value={form.performed_at}
+                onChange={(val) => setForm((f) => ({ ...f, performed_at: val }))}
+                disabled={saving}
+              />
+            </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:px-6 sm:py-4">
-            <p className="text-xs text-slate-400">
-              * Stok persediaan di dashboard akan otomatis disesuaikan
-            </p>
-            <div className="flex gap-2">
+          {/* Footer ringkas */}
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+            <span className="text-[11px] text-slate-400">Stok otomatis disesuaikan</span>
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={saving}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
                 disabled={saving || !canSubmit}
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-700 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Menyimpan...
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
                   </>
                 ) : (
-                  'Simpan Perubahan'
+                  'Simpan'
                 )}
               </button>
             </div>

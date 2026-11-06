@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   Plus,
   PlusCircle,
+  Minus,
   Search,
   RefreshCw,
   AlertCircle,
@@ -14,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import TokenTable from '@/components/tokens/TokenTable'
 import AddTokenModal from '@/components/tokens/AddTokenModal'
 import CreateTokenTypeModal from '@/components/tokens/CreateTokenTypeModal'
+import ReduceModal from '@/components/tokens/ReduceModal'
 import { useTokens } from '@/hooks/useTokens'
 import { useAuth } from '@/hooks/useAuth'
 import { formatTokenLabel, getTokenIcon } from '@/lib/tokenUtils'
@@ -58,6 +60,7 @@ export default function TokensPage() {
 
   const [addStockOpen, setAddStockOpen] = useState(false)
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
+  const [reduceStockOpen, setReduceStockOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('all')
   const [refreshing, setRefreshing] = useState(false)
@@ -155,6 +158,18 @@ export default function TokensPage() {
           >
             <Plus className="h-4 w-4" />
             Tambah Stok
+          </Button>
+
+          {/* Tombol Kurangi Stok (bisa satu atau banyak token sekaligus) */}
+          <Button
+            type="button"
+            size="sm"
+            disabled={tokens.length === 0 || (stats?.remainingAll || 0) <= 0}
+            onClick={() => setReduceStockOpen(true)}
+            className="gap-2 bg-red-600 text-white hover:bg-red-700 cursor-pointer shadow-xs disabled:opacity-50"
+          >
+            <Minus className="h-4 w-4" />
+            Kurangi Stok
           </Button>
         </div>
       </header>
@@ -279,6 +294,14 @@ export default function TokensPage() {
         open={createTypeOpen}
         onClose={() => setCreateTypeOpen(false)}
         onSubmit={addToken}
+      />
+
+      {/* Modal Kurangi Stok (Single / Banyak Token Sekaligus) */}
+      <ReduceModal
+        open={reduceStockOpen}
+        tokens={tokens}
+        onClose={() => setReduceStockOpen(false)}
+        onSubmit={reduceToken}
       />
 
       {/* Konfirmasi hapus data stok */}

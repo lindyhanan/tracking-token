@@ -296,89 +296,132 @@ function useTokensValue() {
     }
   }, [user?.id, tokens, refreshAll, currentUserName])
 
-  // Kurangi stok melalui fungsi database yang atomik
+  // Kurangi stok (mendukung satu token maupun banyak token sekaligus)
   const reduceToken = useCallback(async (
-    token,
-    quantity,
-    description = '',
-    performed_at = null
+    tokenOrItems,
+    quantityOrDesc,
+    descriptionOrDate = '',
+    performedAtArg = null
   ) => {
     try {
       if (!user?.id) {
         throw new Error('Pengguna belum login')
       }
 
-      if (!token?.id) {
-        throw new Error('Token tidak ditemukan')
+      let rawItems = []
+      let description = ''
+      let performed_at = null
+
+      if (Array.isArray(tokenOrItems)) {
+        rawItems = tokenOrItems
+        if (typeof quantityOrDesc === 'string') {
+          description = quantityOrDesc
+          performed_at = descriptionOrDate || null
+        } else {
+          description = descriptionOrDate || ''
+          performed_at = performedAtArg || null
+        }
+      } else {
+        rawItems = [{ token: tokenOrItems, quantity: quantityOrDesc }]
+        description = descriptionOrDate || ''
+        performed_at = performedAtArg || null
       }
 
-      const qty = Number(quantity)
-      if (!Number.isSafeInteger(qty) || qty <= 0) {
-        throw new Error('Jumlah harus bilangan bulat positif')
+      if (rawItems.length === 0) {
+        throw new Error('Pilih minimal satu token untuk diambil')
       }
 
-      const currentTaken = Number(token.taken_quantity || 0)
-      const currentTotal = Number(token.total_stock || 0)
-      const remaining = Math.max(0, currentTotal - currentTaken)
+      // Validasi semua item terlebih dahulu sebelum mengupdate database
+      const validatedItems = rawItems.map(({ token, quantity }) => {
+        if (!token?.id) {
+          throw new Error('Token tidak ditemukan')
+        }
 
-      if (qty > remaining) {
-        throw new Error(`Jumlah pengambilan melebihi sisa stok (${remaining} unit)`)
+        const qty = Number(quantity)
+        const label = formatTokenLabel(token.token_type)
+        if (!Number.isSafeInteger(qty) || qty <= 0) {
+          throw new Error(`Jumlah pengambilan ${label} harus bilangan bulat positif`)
+        }
+
+        const currentTaken = Number(token.taken_quantity || 0)
+        const currentTotal = Number(token.total_stock || 0)
+        const remaining = Math.max(0, currentTotal - currentTaken)
+
+        if (qty > remaining) {
+          throw new Error(`Jumlah pengambilan ${label} melebihi sisa stok (${remaining} unit)`)
+        }
+
+        return {
+          token,
+          qty,
+          currentTaken,
+          remaining,
+          newTaken: currentTaken + qty,
+        }
+      })
+
+      const nowIso = performed_at ? new Date(performed_at).toISOString() : new Date().toISOString()
+      const historyRecords = []
+      const updatedTakenMap = new Map()
+
+      // Update stok masing-masing token di database
+      for (const item of validatedItems) {
+        const { error: updateError } = await supabase
+          .from('token_tracking')
+          .update({ taken_quantity: item.newTaken })
+          .eq('id', item.token.id)
+
+        if (updateError) throw updateError
+
+        updatedTakenMap.set(String(item.token.id), item.newTaken)
+
+        historyRecords.push({
+          token_id: item.token.id || null,
+          token_type: item.token.token_type,
+          action_type: 'reduce',
+          quantity_changed: item.qty,
+          stock_before: item.remaining,
+          stock_after: item.remaining - item.qty,
+          description: description || 'Pengambilan token',
+          performed_by: user.id,
+          performed_at: nowIso,
+        })
       }
-
-      const newTaken = currentTaken + qty
-      const { error: updateError } = await supabase
-        .from('token_tracking')
-        .update({ taken_quantity: newTaken })
-        .eq('id', token.id)
-
-      if (updateError) throw updateError
 
       // Update state token seketika
       setTokens((prev) =>
         prev.map((t) =>
-          String(t.id) === String(token.id)
-            ? { ...t, taken_quantity: newTaken }
+          updatedTakenMap.has(String(t.id))
+            ? { ...t, taken_quantity: updatedTakenMap.get(String(t.id)) }
             : t
         )
       )
 
-      // Catat ke riwayat token_history secara pasti
-      const nowIso = performed_at ? new Date(performed_at).toISOString() : new Date().toISOString()
-      const historyRecord = {
-        token_id: token.id || null,
-        token_type: token.token_type,
-        action_type: 'reduce',
-        quantity_changed: qty,
-        stock_before: remaining,
-        stock_after: remaining - qty,
-        description: description || 'Pengambilan token',
-        performed_by: user.id,
-        performed_at: nowIso,
-      }
-
-      let insertResult = await supabase.from('token_history').insert(historyRecord).select()
+      // Catat semua ke riwayat token_history secara pasti
+      let insertResult = await supabase.from('token_history').insert(historyRecords).select()
 
       if (insertResult.error) {
         console.warn('Gagal insert token_history pengurangan dengan relasi, mencoba fallback:', insertResult.error)
         // Fallback 1: tanpa token_id
-        insertResult = await supabase.from('token_history').insert({
-          ...historyRecord,
-          token_id: null,
-        }).select()
+        insertResult = await supabase.from('token_history').insert(
+          historyRecords.map((rec) => ({ ...rec, token_id: null }))
+        ).select()
       }
 
       if (insertResult.error) {
         console.warn('Gagal insert token_history tanpa token_id, mencoba fallback minimal:', insertResult.error)
         // Fallback 2: tanpa token_id dan performed_by
-        insertResult = await supabase.from('token_history').insert({
-          token_type: token.token_type,
-          action_type: 'reduce',
-          quantity_changed: qty,
-          stock_before: remaining,
-          stock_after: remaining - qty,
-          description: description || 'Pengambilan token',
-          performed_at: nowIso,
-        }).select()
+        insertResult = await supabase.from('token_history').insert(
+          historyRecords.map((rec) => ({
+            token_type: rec.token_type,
+            action_type: 'reduce',
+            quantity_changed: rec.quantity_changed,
+            stock_before: rec.stock_before,
+            stock_after: rec.stock_after,
+            description: rec.description,
+            performed_at: rec.performed_at,
+          }))
+        ).select()
       }
 
       if (insertResult.error) {
@@ -387,12 +430,12 @@ function useTokensValue() {
       }
 
       // Update state history seketika
-      if (insertResult.data && insertResult.data[0]) {
-        const newHist = {
-          ...normalizeHistory(insertResult.data[0]),
+      if (insertResult.data && insertResult.data.length > 0) {
+        const newHists = insertResult.data.map((row) => ({
+          ...normalizeHistory(row),
           performer: { full_name: currentUserName },
-        }
-        setHistory((prev) => [newHist, ...prev])
+        }))
+        setHistory((prev) => [...newHists, ...prev])
       }
 
       await refreshAll()

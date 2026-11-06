@@ -315,6 +315,7 @@ export default function DashboardPage() {
   const [actionError, setActionError] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [createTypeOpen, setCreateTypeOpen] = useState(false);
+  const [reduceOpen, setReduceOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
 
   const availableTypes = useMemo(() => {
@@ -392,16 +393,18 @@ export default function DashboardPage() {
     }
   };
 
-  const handleReduce = async (qty, desc, performedAt) => {
-    if (!selectedToken) return null;
+  const handleReduce = async (itemsOrQty, desc, performedAt) => {
     setActionError("");
     try {
-      const result = await reduceToken(selectedToken, qty, desc, performedAt || null);
+      const result = Array.isArray(itemsOrQty)
+        ? await reduceToken(itemsOrQty, desc, performedAt || null)
+        : await reduceToken(selectedToken, itemsOrQty, desc, performedAt || null);
       setSelectedToken(null);
+      setReduceOpen(false);
       return result;
     } catch (err) {
       setActionError(err.message || "Gagal mengurangi stok");
-      return null;
+      throw err;
     }
   };
 
@@ -468,6 +471,20 @@ export default function DashboardPage() {
             className="gap-2 bg-blue-700 text-white hover:bg-blue-800 cursor-pointer shadow-xs"
           >
             <Plus className="h-4 w-4" /> Tambah Stok
+          </Button>
+
+          {/* Tombol Kurangi Stok (bisa satu atau banyak token sekaligus) */}
+          <Button
+            type="button"
+            size="sm"
+            disabled={tokens.length === 0 || summary.remaining <= 0}
+            onClick={() => {
+              setSelectedToken(null);
+              setReduceOpen(true);
+            }}
+            className="gap-2 bg-red-600 text-white hover:bg-red-700 cursor-pointer shadow-xs disabled:opacity-50"
+          >
+            <Minus className="h-4 w-4" /> Kurangi Stok
           </Button>
         </div>
       </div>
@@ -842,8 +859,12 @@ export default function DashboardPage() {
 
       <ReduceModal
         token={selectedToken}
-        open={Boolean(selectedToken)}
-        onClose={() => setSelectedToken(null)}
+        tokens={tokens}
+        open={Boolean(selectedToken) || reduceOpen}
+        onClose={() => {
+          setSelectedToken(null);
+          setReduceOpen(false);
+        }}
         onSubmit={handleReduce}
       />
     </div>
